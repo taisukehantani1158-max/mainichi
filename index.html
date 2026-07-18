@@ -309,6 +309,54 @@
   .toggle::after{content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%;
     background:#fff; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2)}
   .toggle.on::after{left:25px}
+  .yt-open{display:block; text-align:center; padding:11px; font-size:12px; font-weight:700;
+    color:var(--ink-soft); text-decoration:none; border-top:1px solid var(--line); background:#F8FAFC}
+  .yt-open:active{color:var(--th); background:var(--th-soft)}
+  .who{display:flex; gap:7px; margin-top:16px}
+  .who button{flex:1; padding:11px 0; border-radius:12px; border:1.5px solid var(--line); background:#fff;
+    font-size:14px; font-weight:800; color:var(--ink-soft); cursor:pointer; font-family:inherit; transition:.15s}
+  .who button.on{background:var(--th); color:#fff; border-color:var(--th);
+    box-shadow:0 4px 12px color-mix(in srgb,var(--th) 32%,transparent)}
+  .hobby-add{display:flex; gap:8px; padding:13px 15px}
+  /* 2人の1日：手帳（A）×ポスター（D）の融合 */
+  .nb{margin-top:4px; border-radius:16px; overflow:hidden; background:#FBF7EF; color:#4A4238;
+    background-image:linear-gradient(rgba(122,106,85,.09) 1px, transparent 1px);
+    background-size:100% 27px; box-shadow:inset 0 0 0 1px rgba(122,106,85,.12)}
+  .nb-top{position:relative; padding:26px 16px 16px; text-align:center; background:#2C3A2E; color:#F2EDE0}
+  .nb-tape{position:absolute; top:-7px; left:50%; transform:translateX(-50%) rotate(-2deg);
+    width:96px; height:17px; background:#D9C9A8; opacity:.85; border-radius:2px}
+  .nb-ttl{font-size:20px; font-weight:800; letter-spacing:.14em}
+  .nb-ttl::after{content:""; display:block; width:44px; height:2px; background:#D98E4A; margin:9px auto 0}
+  .nb-sub{margin-top:7px; font-size:9px; letter-spacing:.28em; color:#A8B5A2}
+
+  .nb-ch{padding:14px 14px 10px; position:relative}
+  .nb-ch + .nb-ch{border-top:1px dashed rgba(122,106,85,.28)}
+  .nb-ch.tg{background:linear-gradient(180deg, rgba(143,163,126,.14), rgba(143,163,126,.07))}
+  .nb-h{display:flex; align-items:center; gap:10px; margin-bottom:10px}
+  .nb-mark{flex:0 0 34px; height:34px; border-radius:50%; border:2px solid #D98E4A; color:#2C3A2E;
+    background:#FBF7EF; display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:800; font-variant-numeric:tabular-nums}
+  .nb-ch.tg .nb-mark{background:#2C3A2E; color:#F2EDE0; border-color:#D98E4A}
+  .nb-name{font-size:14px; font-weight:800; color:#5C5142; letter-spacing:.06em}
+  .nb-en{margin-left:auto; font-size:8.5px; letter-spacing:.24em; color:#A2957F; font-weight:700}
+
+  .nb-cols{display:flex; gap:10px}
+  .nb-col{flex:1; min-width:0}
+  .nb-who{text-align:center; font-size:10px; font-weight:800; padding:4px 0; border-radius:20px; margin-bottom:7px}
+  .nb-who.me{background:#E8DCC4; color:#6E5C3E}
+  .nb-who.wf{background:#EBD8DD; color:#7A4F5E}
+  .nb-row{display:flex; gap:6px; align-items:baseline; padding:3px 0}
+  .nb-tm{flex:0 0 32px; font-size:9.5px; font-weight:800; color:#A2957F; font-variant-numeric:tabular-nums}
+  .nb-tx{flex:1; font-size:12px; line-height:1.5; border-bottom:1.5px dotted rgba(122,106,85,.3); padding-bottom:2px}
+  .nb-row.none{color:#BDB3A0; font-size:11px; padding-left:4px}
+
+  .nb-work{margin:0; padding:13px; text-align:center; background:#EFE9DC;
+    border-top:1px dashed rgba(122,106,85,.28); border-bottom:1px dashed rgba(122,106,85,.28)}
+  .nb-work .l{font-size:12px; font-weight:800; color:#7A6A55; letter-spacing:.05em}
+  .nb-work .s{display:block; margin-top:3px; font-size:8.5px; letter-spacing:.3em; color:#A2957F; font-weight:700}
+
+  .nb-foot{padding:13px; text-align:center; background:#2C3A2E; color:#A8B5A2;
+    font-size:9.5px; letter-spacing:.16em; font-weight:700}
   @media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
 </style>
 </head>
@@ -327,13 +375,45 @@
 <div class="wrap">
 
   <section class="view" id="v-train">
-    <div class="days" id="days"></div>
-    <div class="card status">
-      <div class="total">合計 <b id="total">—</b> ／ 完了 <b id="doneCount">0</b> 種目</div>
-      <div class="bar"><span id="bar"></span></div>
-      <div class="cleared" id="cleared">下限クリア。ここでやめても今日は○です。</div>
+    <div class="who">
+      <button id="whoMe" class="on">自分</button>
+      <button id="whoWife">妻</button>
     </div>
-    <div id="list"></div>
+
+    <!-- 自分：筋トレ＋趣味リスト -->
+    <div id="hobbyMe">
+      <div class="sec-title">朝の筋トレ</div>
+      <div class="days" id="days"></div>
+      <div class="card status">
+        <div class="total">合計 <b id="total">—</b> ／ 完了 <b id="doneCount">0</b> 種目</div>
+        <div class="bar"><span id="bar"></span></div>
+        <div class="cleared" id="cleared">下限クリア。ここでやめても今日は○です。</div>
+      </div>
+      <div id="list"></div>
+
+      <div class="sec-title">やりたいこと</div>
+      <div class="card">
+        <div class="hobby-add">
+          <input id="hbMeText" type="text" placeholder="趣味・やりたいこと（例：サウナ／キャンプ）">
+          <button class="btn theme" id="hbMeAdd">追加</button>
+        </div>
+        <div id="hbMeList"></div>
+      </div>
+      <div class="warn">やりたいことは、空き時間ではなく先に予定へ入れる。</div>
+    </div>
+
+    <!-- 妻：趣味リスト -->
+    <div id="hobbyWife" style="display:none">
+      <div class="sec-title">やりたいこと</div>
+      <div class="card">
+        <div class="hobby-add">
+          <input id="hbWifeText" type="text" placeholder="妻の趣味・やりたいこと">
+          <button class="btn theme" id="hbWifeAdd">追加</button>
+        </div>
+        <div id="hbWifeList"></div>
+      </div>
+      <div class="warn">2人の予定として押さえたいものは、「やること」に日付つきで入れる。</div>
+    </div>
   </section>
 
   <section class="view on" id="v-task">
@@ -494,7 +574,7 @@
   <button data-v="diary"><span class="ic">📷</span>日記</button>
   <button data-v="money"><span class="ic">💴</span>家計簿</button>
   <button data-v="stock"><span class="ic">📦</span>在庫</button>
-  <button data-v="train"><span class="ic">🏋️</span>筋トレ</button>
+  <button data-v="train"><span class="ic">🎣</span>趣味</button>
   <button data-v="wish"><span class="ic">📚</span>読む見る</button>
   <button data-v="guide"><span class="ic">🗒️</span>まとめ</button>
   <button data-v="settings"><span class="ic">⚙️</span>設定</button>
@@ -503,7 +583,7 @@
 <script>
 /* ===== 保存 ===== */
 const KEY="mainichi-v2";
-let mem={ tasks:[], wish:{books:[],anime:[],games:[]}, diary:[], money:[], stock:[] };
+let mem={ tasks:[], wish:{books:[],anime:[],games:[]}, diary:[], money:[], stock:[], hobby:{me:[],wife:[]} };
 try{ const raw=localStorage.getItem(KEY); if(raw) mem=Object.assign(mem,JSON.parse(raw)); }catch(e){}
 
 /* ===== クラウド同期（妻と共有） =====
@@ -513,7 +593,7 @@ try{ const raw=localStorage.getItem(KEY); if(raw) mem=Object.assign(mem,JSON.par
 const DB_URL="https://mainichi-dda22-default-rtdb.asia-southeast1.firebasedatabase.app";
 const SHARED_PATH="/shared.json";           // 軽いデータ（頻繁に同期）
 const DIARY_PATH="/diary.json";             // 日記（写真が重いので開いた時と保存時のみ）
-const SHARED_KEYS=["tasks","wish","money","stock"];
+const SHARED_KEYS=["tasks","wish","money","stock","hobby"];
 let syncOn=true;                             // 同期の有効・無効
 let lastPulledAt=0;                          // 最後に取り込んだ時刻
 let pushTimer=null;                          // 連続保存をまとめるためのタイマー
@@ -575,7 +655,7 @@ async function pullCloud(force){
     lastPulledAt=data._updatedAt||Date.now();
     if(changed){
       try{ localStorage.setItem(KEY,JSON.stringify(mem)); }catch(e){}
-      renderTasks(); renderWish(); renderMoney(); renderStock();
+      renderTasks(); renderWish(); renderMoney(); renderStock(); renderHobby("me"); renderHobby("wife");
     }
     setSyncBadge("idle");
   }catch(e){ setSyncBadge("error","同期エラー（後で再試行）"); }
@@ -714,15 +794,70 @@ function renderTraining(){
     const box=document.createElement("div"); box.className="player";
     const thumb=document.createElement("button"); thumb.className="thumb";
     thumb.style.backgroundImage=`url(https://i.ytimg.com/vi/${v.id}/hqdefault.jpg)`;
-    thumb.innerHTML=`<div class="play">▶</div><div class="hint">${EMBED_OK?"タップして再生":"タップして YouTube で再生"}</div>`;
-    thumb.onclick=()=>{ if(EMBED_OK){ const f=document.createElement("iframe");
-      f.src=`https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&playsinline=1`;
-      f.allow="autoplay; encrypted-media; picture-in-picture; fullscreen"; f.allowFullscreen=true; box.innerHTML=""; box.appendChild(f);
-    }else window.open(`https://www.youtube.com/watch?v=${v.id}`,"_blank","noopener"); };
-    box.appendChild(thumb); card.appendChild(box); list.appendChild(card);
+    thumb.innerHTML=`<div class="play">▶</div><div class="hint">タップして再生</div>`;
+    thumb.onclick=()=>{
+      if(EMBED_OK){
+        const f=document.createElement("iframe");
+        f.src=`https://www.youtube.com/embed/${v.id}?autoplay=1&rel=0&playsinline=1`;
+        f.allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+        f.allowFullscreen=true;
+        f.referrerPolicy="strict-origin-when-cross-origin";
+        box.innerHTML=""; box.appendChild(f);
+      }else{
+        window.open(`https://www.youtube.com/watch?v=${v.id}`,"_blank","noopener");
+      }
+    };
+    box.appendChild(thumb); card.appendChild(box);
+    // 再生できないときの逃げ道（埋め込み禁止の動画やアプリ内ブラウザ対策）
+    const open=document.createElement("a");
+    open.className="yt-open"; open.href=`https://www.youtube.com/watch?v=${v.id}`;
+    open.target="_blank"; open.rel="noopener";
+    open.textContent="▶ YouTubeアプリで開く";
+    card.appendChild(open);
+    list.appendChild(card);
   });
   updateProgress();
 }
+/* ===== 趣味（自分・妻） ===== */
+let whoNow="me";
+function renderWho(){
+  document.getElementById("whoMe").className=(whoNow==="me"?"on":"");
+  document.getElementById("whoWife").className=(whoNow==="wife"?"on":"");
+  document.getElementById("hobbyMe").style.display=(whoNow==="me"?"":"none");
+  document.getElementById("hobbyWife").style.display=(whoNow==="wife"?"":"none");
+}
+document.getElementById("whoMe").onclick=()=>{ whoNow="me"; renderWho(); };
+document.getElementById("whoWife").onclick=()=>{ whoNow="wife"; renderWho(); };
+
+function renderHobby(who){
+  if(!mem.hobby) mem.hobby={me:[],wife:[]};
+  const items=mem.hobby[who]||[];
+  const wrap=document.getElementById(who==="me"?"hbMeList":"hbWifeList");
+  wrap.innerHTML="";
+  if(!items.length){ wrap.innerHTML='<div class="empty">まだありません。やりたいことを書き出す。</div>'; return; }
+  items.forEach((it,i)=>{
+    const row=document.createElement("div"); row.className="li"+(it.done?" done":"");
+    const box=document.createElement("button"); box.className="box"; box.textContent="✓";
+    box.onclick=()=>{ it.done=!it.done; save(); renderHobby(who); };
+    const txt=document.createElement("div"); txt.className="txt"; txt.textContent=it.text;
+    const del=document.createElement("button"); del.className="del"; del.textContent="×";
+    del.onclick=()=>{ items.splice(i,1); save(); renderHobby(who); };
+    row.append(box,txt,del); wrap.appendChild(row);
+  });
+}
+function addHobby(who){
+  const el=document.getElementById(who==="me"?"hbMeText":"hbWifeText");
+  const text=el.value.trim(); if(!text) return;
+  if(!mem.hobby) mem.hobby={me:[],wife:[]};
+  if(!mem.hobby[who]) mem.hobby[who]=[];
+  mem.hobby[who].push({text,done:false});
+  el.value=""; save(); renderHobby(who);
+}
+document.getElementById("hbMeAdd").onclick=()=>addHobby("me");
+document.getElementById("hbWifeAdd").onclick=()=>addHobby("wife");
+document.getElementById("hbMeText").addEventListener("keydown",e=>{ if(e.key==="Enter") addHobby("me"); });
+document.getElementById("hbWifeText").addEventListener("keydown",e=>{ if(e.key==="Enter") addHobby("wife"); });
+
 function updateProgress(){
   const menu=MENU[curDow]; const done=menu.items.filter(k=>doneSet.has(k)).length;
   document.getElementById("doneCount").textContent=done;
@@ -951,6 +1086,22 @@ const SCHEDULE=[
   ["22:40","終了アラーム／翌朝の準備","夜","スマホを置く"],
   ["23:00","就寝","夜","同じ時間に寝る"]
 ];
+const SCHEDULE_WIFE=[
+  ["06:00","起床・洗顔・歯磨き","朝",""],
+  ["06:15","弁当・朝ごはん・コーヒー準備","朝",""],
+  ["06:30","朝食","朝",""],
+  ["06:45","片付け・食器洗い・軽く整頓・出勤服準備","朝",""],
+  ["07:00","メイク10分・髪5分","朝",""],
+  ["07:15","最終確認5分","朝",""],
+  ["07:20","出発（7:30がタイムリミット）","移動",""],
+  ["18:30","帰宅","夜",""],
+  ["18:30","お風呂15分・髪乾かし5分・まったり10分","夜",""],
+  ["19:30","ご飯支度（終わり次第 自由時間）","夜",""],
+  ["20:30","夕食20分・片付け10分","夜",""],
+  ["21:00","自由時間","夜",""],
+  ["22:00","自由時間2","夜",""],
+  ["23:00","就寝","夜",""]
+];
 const CLEAN_DAILY=[["シンク","スポンジ","汚れ時のみホームリセット"],["食卓","マイクロファイバークロス","パストリーゼ"],
   ["テーブル","マイクロファイバークロス","ホームリセット"],["床","ロボット掃除機","なし"]];
 const CLEAN_WEEK=[["月","洗面所","洗面ボウル・鏡・蛇口（クエン酸ほか）"],["火","トイレ","便器・便座・床"],
@@ -985,13 +1136,54 @@ function renderGuide(){
   const card=document.createElement("div"); card.className="card";
 
   if(guideKey==="schedule"){
-    let h='<div class="g-lead">平日の理想の型（6:00起床〜23:00就寝）。崩れる日があって当然。管理するのは就寝時刻ではなく終了アラーム（22:40）。</div><div class="tl">';
-    SCHEDULE.forEach(([t,w,b,m])=>{
-      h+=`<div class="tl-item"><div class="tl-time">${t}</div>
-        <div class="tl-line"><div class="tl-dot"></div></div>
-        <div class="tl-body"><div class="tl-what">${w}<span class="tl-tag ${b}">${b}</span></div>${m?`<div class="tl-memo">${m}</div>`:""}</div></div>`;
+    // A（手帳）×D（ポスター）の融合。
+    // 時間帯ごとの「章」に分け、各章の見出しに丸い時刻マーカーを置く。
+    // 章の中は左＝自分／右＝妻の2列で、点線の罫線に沿って並べる。
+    const chapters=[
+      {mark:"6",  title:"朝",   sub:"MORNING",
+       me:[["6:00","起床・洗濯機を回す"],["6:05","朝の筋トレ"],["6:20","家計簿・日記"],["6:30","読書"],["6:45","身支度・朝食"]],
+       wf:[["6:00","起床・洗顔・歯磨き"],["6:15","弁当・朝食・コーヒー準備"],["6:30","朝食"],["6:45","片付け・整頓・服準備"]]},
+      {mark:"7",  title:"出発", sub:"LEAVING",
+       me:[["7:30","出発"]],
+       wf:[["7:00","メイク10分・髪5分"],["7:15","最終確認"],["7:20","出発（7:30まで）"]]},
+      {work:true, label:"8:30 — 17:30", sub:"W O R K"},
+      {mark:"18", title:"夕方", sub:"EVENING",
+       me:[],
+       wf:[["18:30","帰宅・風呂・髪・まったり"],["19:30","ご飯支度"]]},
+      {mark:"20", title:"ふたりの時間", sub:"TOGETHER", together:true,
+       me:[["20:00","帰宅・夕食"],["20:40","毎日の掃除4か所"],["20:55","当番の家事・掃除"],["21:15","在庫確認→献立"],["21:25","妻とまったり"],["21:30","ごみ出し"]],
+       wf:[["20:30","夕食・片付け"],["21:00","自由時間"],["22:00","自由時間2"]]},
+      {mark:"23", title:"就寝", sub:"GOOD NIGHT",
+       me:[["22:40","終了アラーム・翌朝の準備"],["23:00","就寝"]],
+       wf:[["23:00","就寝"]]}
+    ];
+
+    const rows=(list)=>list.length
+      ? list.map(([t,w])=>`<div class="nb-row"><span class="nb-tm">${t}</span><span class="nb-tx">${w}</span></div>`).join("")
+      : '<div class="nb-row none">—</div>';
+
+    let h='<div class="g-lead">平日の1日。<b>20:00〜23:00 がふたりの時間</b>です。'
+         +'崩れる日があって当然。管理するのは就寝時刻ではなく終了アラーム（22:40）。</div>'
+         +'<div class="nb">'
+         +'<div class="nb-top"><span class="nb-tape"></span><div class="nb-ttl">2人の1日</div>'
+         +'<div class="nb-sub">O U R　D A I L Y　R O U T I N E</div></div>';
+
+    chapters.forEach(ch=>{
+      if(ch.work){
+        h+=`<div class="nb-work"><span class="l">${ch.label}</span><span class="s">${ch.sub}</span></div>`;
+        return;
+      }
+      h+=`<section class="nb-ch${ch.together?" tg":""}">`
+        +`<div class="nb-h"><span class="nb-mark">${ch.mark}</span>`
+        +`<span class="nb-name">${ch.title}</span><span class="nb-en">${ch.sub}</span></div>`
+        +'<div class="nb-cols">'
+        +`<div class="nb-col"><div class="nb-who me">自分</div>${rows(ch.me)}</div>`
+        +`<div class="nb-col"><div class="nb-who wf">妻</div>${rows(ch.wf)}</div>`
+        +'</div></section>';
     });
-    h+="</div>"; card.innerHTML=h;
+
+    h+='<div class="nb-foot">ふ た り の 時 間 　 20:00 — 23:00</div></div>';
+    card.innerHTML=h;
   } else if(guideKey==="clean"){
     card.innerHTML='<div class="g-lead">毎日の4か所＋曜日別（当番の日だけ）。</div>'
       +tableHTML(["場所","道具","洗剤"],CLEAN_DAILY,0)
@@ -1092,7 +1284,7 @@ document.getElementById("setImport").onchange=e=>{
 document.getElementById("setWipe").onclick=()=>{
   if(!confirm("この端末の記録をすべて消します。取り消せません。よろしいですか？")) return;
   if(!confirm("本当に消してよろしいですか？ 事前に書き出していない場合、復元できません。")) return;
-  mem={ tasks:[], wish:{books:[],anime:[],games:[]}, diary:[], money:[], stock:[] };
+  mem={ tasks:[], wish:{books:[],anime:[],games:[]}, diary:[], money:[], stock:[], hobby:{me:[],wife:[]} };
   save();
   renderTasks(); renderWishTabs(); renderWish(); loadDay(TODAY); renderDiaryCal(); renderEntries(); renderMoney(); renderStock(); renderSettings();
   document.getElementById("setMsg").textContent="すべて消去しました。";
@@ -1100,7 +1292,7 @@ document.getElementById("setWipe").onclick=()=>{
 
 /* ===== 画面切り替え ===== */
 const HDR={
-  train:["MORNING","今日のメニュー","腹筋2分だけやれば、今日は達成。"],
+  train:["HOBBY","趣味","朝の筋トレと、やりたいこと。"],
   task:["TO DO","やること","★と期限のあるものが上に来る。"],
   wish:["SOMEDAY","読む・見る・遊ぶ","急がないもの。時間ができたらここから。"],
   diary:["DIARY","日記","写真を1枚。それが今日の証拠になる。"],
@@ -1127,6 +1319,7 @@ renderDays(); renderTraining();
 renderTasks(); renderWishTabs(); renderWish();
 loadDay(TODAY); renderDiaryCal(); renderEntries();
 fillCats(); renderMoney(); renderStock();
+renderWho(); renderHobby("me"); renderHobby("wife");
 
 /* ===== 同期の開始 =====
    起動時にクラウドから取り込み、その後は定期的に確認する。
