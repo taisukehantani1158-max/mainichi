@@ -3,10 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#16233A">
+<meta name="theme-color" content="#3E5C43">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="毎日">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
 <title>毎日</title>
 <style>
   :root{
@@ -292,23 +295,38 @@
   .rule-list li{list-style:none; display:flex; gap:10px; padding:9px 0; border-bottom:1px dashed var(--line); font-size:14px; align-items:flex-start}
   .rule-list li:last-child{border-bottom:0}
   .rule-list .rn{flex:0 0 24px; height:24px; border-radius:50%; background:var(--th); color:#fff; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center}
+  .sync-badge{position:absolute; right:16px; top:calc(16px + env(safe-area-inset-top)); z-index:2;
+    font-size:10px; font-weight:800; letter-spacing:.04em; padding:4px 10px; border-radius:99px;
+    background:rgba(255,255,255,.22); color:#fff; backdrop-filter:blur(6px)}
+  .sync-badge.error{background:rgba(181,67,46,.9)}
+  .sync-badge.offline{background:rgba(0,0,0,.28)}
+  .sync-row{display:flex; align-items:center; gap:12px; padding:14px 15px}
+  .sync-row .txt{flex:1; font-size:14px; font-weight:700}
+  .sync-row .sub{font-size:12px; color:var(--ink-soft); font-weight:400; margin-top:3px}
+  .toggle{width:52px; height:30px; flex:0 0 52px; border-radius:99px; border:0; cursor:pointer;
+    background:var(--line); position:relative; transition:.2s; font-family:inherit}
+  .toggle.on{background:var(--done)}
+  .toggle::after{content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%;
+    background:#fff; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .toggle.on::after{left:25px}
   @media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="deco" id="hdrDeco">🌻</div>
+  <div class="deco" id="hdrDeco">🌿</div>
+  <div class="sync-badge" id="syncBadge">同期</div>
   <div class="wrap">
-    <div class="eyebrow" id="hdrE">MORNING</div>
-    <h1 id="hdrT">今日のメニュー</h1>
-    <div class="sub" id="hdrS">腹筋2分だけやれば、今日は達成。</div>
+    <div class="eyebrow" id="hdrE">TO DO</div>
+    <h1 id="hdrT">やること</h1>
+    <div class="sub" id="hdrS">★と期限のあるものが上に来る。</div>
   </div>
 </header>
 
 <div class="wrap">
 
-  <section class="view on" id="v-train">
+  <section class="view" id="v-train">
     <div class="days" id="days"></div>
     <div class="card status">
       <div class="total">合計 <b id="total">—</b> ／ 完了 <b id="doneCount">0</b> 種目</div>
@@ -318,7 +336,7 @@
     <div id="list"></div>
   </section>
 
-  <section class="view" id="v-task">
+  <section class="view on" id="v-task">
     <div class="card">
       <div class="task-form">
         <input id="tText" type="text" placeholder="やること（例：保険の更新／荷物受け取り）">
@@ -428,16 +446,58 @@
     <div class="warn">貼り出し用の印刷PDFは別途お渡ししています。<br>ここではいつでも見返せるようアプリに収めています。</div>
   </section>
 
+  <!-- 設定 -->
+  <section class="view" id="v-settings">
+    <div class="sec-title">妻との共有（自動同期）</div>
+    <div class="card">
+      <div class="sync-row">
+        <div class="txt">自動同期
+          <div class="sub">やること・読む見る・家計簿・在庫・日記を、2人の端末で同じ内容に保ちます。</div>
+        </div>
+        <button class="toggle on" id="syncToggle" aria-label="自動同期の切り替え"></button>
+      </div>
+      <div style="padding:0 15px 14px">
+        <button class="btn ghost sm" id="syncNow" style="width:100%">今すぐ同期する</button>
+        <div id="syncMsg" style="font-size:12px; color:var(--ink-soft); margin-top:9px; line-height:1.7"></div>
+      </div>
+    </div>
+    <div class="warn" style="margin-top:10px">日記は写真が重いため、<b>保存したときと画面を開いたとき</b>に同期します（他は約20秒ごと）。<br>口座番号やパスワードなど、見られて困る情報は入力しないでください。</div>
+
+    <div class="sec-title">データの持ち出し・引き継ぎ</div>
+    <div class="card">
+      <div class="g-lead">記録はこの端末の中だけに保存されています。機種変更や、妻の端末へ渡すときは、ここで書き出して相手の端末で読み込みます。</div>
+      <div class="btnrow" style="display:flex; gap:8px; padding:12px 14px">
+        <button class="btn theme" id="setExport" style="flex:1">全データを書き出す</button>
+        <label class="btn ghost" id="setImportLabel" style="flex:1; text-align:center">読み込む
+          <input id="setImport" type="file" accept="application/json" style="display:none"></label>
+      </div>
+      <div id="setMsg" style="padding:0 14px 14px; font-size:12px; color:var(--ink-soft)"></div>
+    </div>
+
+    <div class="sec-title">保存容量の目安</div>
+    <div class="card"><div id="setUsage" style="padding:14px; font-size:13px; color:var(--ink-soft)"></div></div>
+
+    <div class="sec-title">全消去</div>
+    <div class="card">
+      <div class="g-lead">この端末の記録をすべて消します。取り消せません。事前に「書き出す」でバックアップを。</div>
+      <div style="padding:12px 14px">
+        <button class="btn" id="setWipe" style="background:var(--alert); width:100%">すべて消去する</button>
+      </div>
+    </div>
+    <div class="warn">妻とリアルタイムで共有する仕組みは、別途サーバー設定が必要です。<br>手順書を用意しています（PWA設定ガイド）。</div>
+  </section>
+
 </div>
 
 <nav>
-  <button data-v="train" class="active"><span class="ic">🏋️</span>筋トレ</button>
-  <button data-v="task"><span class="ic">✅</span>やること</button>
-  <button data-v="wish"><span class="ic">📚</span>読む見る</button>
+  <button data-v="task" class="active"><span class="ic">✅</span>やること</button>
   <button data-v="diary"><span class="ic">📷</span>日記</button>
   <button data-v="money"><span class="ic">💴</span>家計簿</button>
   <button data-v="stock"><span class="ic">📦</span>在庫</button>
+  <button data-v="train"><span class="ic">🏋️</span>筋トレ</button>
+  <button data-v="wish"><span class="ic">📚</span>読む見る</button>
   <button data-v="guide"><span class="ic">🗒️</span>まとめ</button>
+  <button data-v="settings"><span class="ic">⚙️</span>設定</button>
 </nav>
 
 <script>
@@ -445,8 +505,135 @@
 const KEY="mainichi-v2";
 let mem={ tasks:[], wish:{books:[],anime:[],games:[]}, diary:[], money:[], stock:[] };
 try{ const raw=localStorage.getItem(KEY); if(raw) mem=Object.assign(mem,JSON.parse(raw)); }catch(e){}
-function save(){ try{ localStorage.setItem(KEY,JSON.stringify(mem)); }
-  catch(e){ alert("保存できませんでした。写真が多すぎる可能性があります（古い月の写真を減らしてください）。"); } }
+
+/* ===== クラウド同期（妻と共有） =====
+   共有するのは tasks / wish / money / stock の4つ。
+   日記は写真が大きく個人的な内容のため、各自の端末内にのみ保存する。
+   Firebase Realtime Database の REST API を使用（SDK読み込み不要）。 */
+const DB_URL="https://mainichi-dda22-default-rtdb.asia-southeast1.firebasedatabase.app";
+const SHARED_PATH="/shared.json";           // 軽いデータ（頻繁に同期）
+const DIARY_PATH="/diary.json";             // 日記（写真が重いので開いた時と保存時のみ）
+const SHARED_KEYS=["tasks","wish","money","stock"];
+let syncOn=true;                             // 同期の有効・無効
+let lastPulledAt=0;                          // 最後に取り込んだ時刻
+let pushTimer=null;                          // 連続保存をまとめるためのタイマー
+let syncState="idle";                        // idle / syncing / error / offline
+
+try{ const s=localStorage.getItem("mainichi-sync"); if(s!==null) syncOn=(s==="1"); }catch(e){}
+
+function setSyncBadge(state, msg){
+  syncState=state;
+  const el=document.getElementById("syncBadge");
+  if(!el) return;
+  const label={idle:"同期済み", syncing:"同期中…", error:"同期エラー", offline:"同期オフ"}[state]||"";
+  el.textContent=msg||label;
+  el.className="sync-badge "+state;
+}
+
+/* 共有分だけを抜き出す */
+function sharedSlice(){
+  const o={};
+  SHARED_KEYS.forEach(k=>{ o[k]=mem[k]; });
+  o._updatedAt=Date.now();
+  return o;
+}
+
+/* クラウドへ送る（連続入力をまとめて1回にする） */
+function pushCloud(){
+  if(!syncOn) return;
+  clearTimeout(pushTimer);
+  pushTimer=setTimeout(async ()=>{
+    setSyncBadge("syncing");
+    try{
+      const res=await fetch(DB_URL+SHARED_PATH,{
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(sharedSlice())
+      });
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      lastPulledAt=Date.now();
+      setSyncBadge("idle");
+    }catch(e){ setSyncBadge("error","同期エラー（後で再試行）"); }
+  }, 800);
+}
+
+/* クラウドから受け取る */
+async function pullCloud(force){
+  if(!syncOn) return;
+  try{
+    const res=await fetch(DB_URL+SHARED_PATH+"?t="+Date.now());
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const data=await res.json();
+    if(!data) return;                       // まだ何も無い
+    if(!force && data._updatedAt && data._updatedAt<=lastPulledAt) return; // 変化なし
+    let changed=false;
+    SHARED_KEYS.forEach(k=>{
+      if(data[k]!==undefined && JSON.stringify(data[k])!==JSON.stringify(mem[k])){
+        mem[k]=data[k]; changed=true;
+      }
+    });
+    lastPulledAt=data._updatedAt||Date.now();
+    if(changed){
+      try{ localStorage.setItem(KEY,JSON.stringify(mem)); }catch(e){}
+      renderTasks(); renderWish(); renderMoney(); renderStock();
+    }
+    setSyncBadge("idle");
+  }catch(e){ setSyncBadge("error","同期エラー（後で再試行）"); }
+}
+
+/* 保存：端末に保存し、共有分はクラウドにも送る */
+function save(opts){
+  try{ localStorage.setItem(KEY,JSON.stringify(mem)); }
+  catch(e){ alert("保存できませんでした。写真が多すぎる可能性があります（古い月の写真を減らしてください）。"); }
+  pushCloud();
+  if(opts && opts.diary) pushDiary();
+}
+
+/* 日記をクラウドへ送る（写真が重いので、保存操作のときだけ） */
+let diaryPushTimer=null;
+function pushDiary(){
+  if(!syncOn) return;
+  clearTimeout(diaryPushTimer);
+  diaryPushTimer=setTimeout(async ()=>{
+    setSyncBadge("syncing","日記を同期中…");
+    try{
+      const res=await fetch(DB_URL+DIARY_PATH,{
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ entries:mem.diary, _updatedAt:Date.now() })
+      });
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      setSyncBadge("idle");
+    }catch(e){ setSyncBadge("error","日記の同期に失敗（容量超過の可能性）"); }
+  }, 1200);
+}
+
+/* 日記をクラウドから受け取る（アプリを開いた時・日記タブを開いた時） */
+let diaryPulledAt=0;
+async function pullDiary(force){
+  if(!syncOn) return;
+  try{
+    const res=await fetch(DB_URL+DIARY_PATH+"?t="+Date.now());
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const data=await res.json();
+    if(!data || !data.entries) return;
+    if(!force && data._updatedAt && data._updatedAt<=diaryPulledAt) return;
+    diaryPulledAt=data._updatedAt||Date.now();
+    // 日付ごとに突き合わせ、相手の新しい記録を取り込む
+    let changed=false;
+    const byDate={};
+    (mem.diary||[]).forEach(e=>{ byDate[e.date]=e; });
+    data.entries.forEach(e=>{
+      const mine=byDate[e.date];
+      if(!mine || JSON.stringify(mine)!==JSON.stringify(e)){ byDate[e.date]=e; changed=true; }
+    });
+    if(changed){
+      mem.diary=Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date));
+      try{ localStorage.setItem(KEY,JSON.stringify(mem)); }catch(e){}
+      renderDiaryCal(); renderEntries();
+    }
+  }catch(e){ /* 日記の取得失敗は画面を妨げない */ }
+}
 const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const TODAY=ymd(new Date());
 const yen=n=>"¥"+Number(n).toLocaleString();
@@ -629,7 +816,7 @@ function loadDay(date){ dSel=date; const e=mem.diary.find(x=>x.date===date);
 document.getElementById("dSave").onclick=()=>{ if(!draftPhotos.length) return;
   const text=document.getElementById("dText").value.trim(); const e=mem.diary.find(x=>x.date===dSel);
   if(e){ e.text=text; e.photos=[...draftPhotos]; } else mem.diary.push({date:dSel,text,photos:[...draftPhotos]});
-  save(); renderDiaryCal(); renderEntries(); };
+  save({diary:true}); renderDiaryCal(); renderEntries(); };
 document.getElementById("dPrev").onclick=()=>{ dView.setMonth(dView.getMonth()-1); renderDiaryCal(); renderEntries(); };
 document.getElementById("dNext").onclick=()=>{ dView.setMonth(dView.getMonth()+1); renderDiaryCal(); renderEntries(); };
 function renderDiaryCal(){
@@ -833,6 +1020,84 @@ function renderGuide(){
   body.appendChild(card);
 }
 
+/* ===== 設定（データ持ち出し・引き継ぎ） ===== */
+function renderSettings(){
+  // 同期トグルの見た目
+  const t=document.getElementById("syncToggle");
+  if(t) t.className="toggle"+(syncOn?" on":"");
+  const msg=document.getElementById("syncMsg");
+  if(msg && !msg.textContent){
+    msg.textContent=syncOn
+      ? "同期は有効です。相手が入力した内容は、数十秒以内に反映されます。"
+      : "同期はオフです。この端末の中だけに保存されます。";
+  }
+  // 保存容量の目安
+  let bytes=0;
+  try{ bytes=new Blob([localStorage.getItem(KEY)||""]).size; }catch(e){}
+  const kb=(bytes/1024).toFixed(0);
+  const photos=(mem.diary||[]).reduce((n,d)=>n+(d.photos?d.photos.length:0),0);
+  document.getElementById("setUsage").textContent=
+    `使用中：約${kb} KB（日記の写真 ${photos} 枚を含む）。ブラウザの上限（約5MB）に近づいたら、古い月の写真を減らしてください。`;
+}
+document.getElementById("syncToggle").onclick=()=>{
+  syncOn=!syncOn;
+  try{ localStorage.setItem("mainichi-sync", syncOn?"1":"0"); }catch(e){}
+  document.getElementById("syncToggle").className="toggle"+(syncOn?" on":"");
+  document.getElementById("syncMsg").textContent=syncOn
+    ? "同期を有効にしました。この端末の内容をクラウドに送ります。"
+    : "同期をオフにしました。この端末の中だけに保存されます。";
+  if(syncOn){ setSyncBadge("syncing"); pushCloud(); } else setSyncBadge("offline");
+};
+document.getElementById("syncNow").onclick=async ()=>{
+  if(!syncOn){ document.getElementById("syncMsg").textContent="同期がオフです。先に自動同期をオンにしてください。"; return; }
+  document.getElementById("syncMsg").textContent="同期しています…";
+  setSyncBadge("syncing");
+  await pullCloud(true);
+  await pullDiary(true);
+  pushCloud(); pushDiary();
+  document.getElementById("syncMsg").textContent="同期しました（日記を含む）。";
+};
+document.getElementById("setExport").onclick=()=>{
+  const blob=new Blob([JSON.stringify(mem,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  const d=new Date(); const stamp=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
+  a.href=URL.createObjectURL(blob); a.download=`毎日データ_${stamp}.json`; a.click();
+  document.getElementById("setMsg").textContent="書き出しました。相手の端末でこのファイルを『読み込む』と、同じ記録になります。";
+};
+document.getElementById("setImport").onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const data=JSON.parse(r.result);
+      // マージ（重複を避けつつ取り込む）
+      if(Array.isArray(data.tasks)) mem.tasks=data.tasks;
+      if(data.wish) mem.wish=Object.assign(mem.wish,data.wish);
+      if(Array.isArray(data.diary)){
+        const seen=new Set(mem.diary.map(x=>x.date));
+        data.diary.forEach(x=>{ if(seen.has(x.date)) { const i=mem.diary.findIndex(y=>y.date===x.date); mem.diary[i]=x; } else mem.diary.push(x); });
+      }
+      if(Array.isArray(data.money)){
+        const seen=new Set(mem.money.map(x=>x.date+x.name+x.amount+x.type));
+        data.money.forEach(x=>{ if(!seen.has(x.date+x.name+x.amount+x.type)) mem.money.push(x); });
+      }
+      if(Array.isArray(data.stock)) mem.stock=data.stock;
+      save();
+      renderTasks(); renderWish(); renderDiaryCal(); renderEntries(); renderMoney(); renderStock(); renderSettings();
+      document.getElementById("setMsg").textContent="読み込みました（日記・在庫は相手側で上書き、家計簿は重複を除いて合算）。";
+    }catch(err){ document.getElementById("setMsg").textContent="読み込めませんでした。ファイルが壊れている可能性があります。"; }
+  };
+  r.readAsText(f); e.target.value="";
+};
+document.getElementById("setWipe").onclick=()=>{
+  if(!confirm("この端末の記録をすべて消します。取り消せません。よろしいですか？")) return;
+  if(!confirm("本当に消してよろしいですか？ 事前に書き出していない場合、復元できません。")) return;
+  mem={ tasks:[], wish:{books:[],anime:[],games:[]}, diary:[], money:[], stock:[] };
+  save();
+  renderTasks(); renderWishTabs(); renderWish(); loadDay(TODAY); renderDiaryCal(); renderEntries(); renderMoney(); renderStock(); renderSettings();
+  document.getElementById("setMsg").textContent="すべて消去しました。";
+};
+
 /* ===== 画面切り替え ===== */
 const HDR={
   train:["MORNING","今日のメニュー","腹筋2分だけやれば、今日は達成。"],
@@ -841,7 +1106,8 @@ const HDR={
   diary:["DIARY","日記","写真を1枚。それが今日の証拠になる。"],
   money:["MONEY","家計簿","毎日つける。金額を詰めるのはその後。"],
   stock:["STOCK","在庫","残り1で買い足しリストに上がる。"],
-  guide:["GUIDE","まとめ","1日の流れと、貼り出し用の各表。"]
+  guide:["GUIDE","まとめ","1日の流れと、貼り出し用の各表。"],
+  settings:["SETTINGS","設定","データの持ち出しと引き継ぎ。"]
 };
 document.querySelectorAll("nav button").forEach(b=>{
   b.onclick=()=>{ const v=b.dataset.v;
@@ -849,9 +1115,9 @@ document.querySelectorAll("nav button").forEach(b=>{
     document.querySelectorAll(".view").forEach(x=>x.classList.remove("on")); document.getElementById("v-"+v).classList.add("on");
     document.getElementById("hdrE").textContent=HDR[v][0]; document.getElementById("hdrT").textContent=HDR[v][1]; document.getElementById("hdrS").textContent=HDR[v][2];
     // ヘッダーの季節色は「表示中の月」に追従（日記・家計簿）、それ以外は今月
-    if(v==="diary"){ renderDiaryCal(); setHeaderDeco(dView.getMonth()+1); }
+    if(v==="diary"){ renderDiaryCal(); setHeaderDeco(dView.getMonth()+1); pullDiary(false); }
     else if(v==="money"){ renderMoney(); setBaseDeco(); }
-    else{ applyBase(); setBaseDeco(); if(v==="guide") renderGuide(); }
+    else{ applyBase(); setBaseDeco(); if(v==="guide") renderGuide(); if(v==="settings") renderSettings(); }
     window.scrollTo({top:0});
   };
 });
@@ -861,6 +1127,23 @@ renderDays(); renderTraining();
 renderTasks(); renderWishTabs(); renderWish();
 loadDay(TODAY); renderDiaryCal(); renderEntries();
 fillCats(); renderMoney(); renderStock();
+
+/* ===== 同期の開始 =====
+   起動時にクラウドから取り込み、その後は定期的に確認する。
+   画面に戻ってきたときにも取り込み、相手の入力を素早く反映する。 */
+if(syncOn){ setSyncBadge("syncing"); pullCloud(true); pullDiary(true); } else setSyncBadge("offline");
+setInterval(()=>{ if(syncOn && document.visibilityState==="visible") pullCloud(false); }, 20000);
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") pullCloud(false); });
+window.addEventListener("online",()=>{ if(syncOn){ pullCloud(true); pushCloud(); } });
+window.addEventListener("offline",()=>{ setSyncBadge("error","オフライン"); });
+</script>
+<script>
+/* PWA: サービスワーカー登録（https で開いたときのみ有効。file:// では自動的に無効） */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
