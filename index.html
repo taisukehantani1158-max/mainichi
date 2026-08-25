@@ -357,6 +357,23 @@
 
   .nb-foot{padding:13px; text-align:center; background:#2C3A2E; color:#A8B5A2;
     font-size:9.5px; letter-spacing:.16em; font-weight:700}
+  .li .edit{border:0; background:none; font-size:15px; cursor:pointer; padding:0 3px; color:#C7BFA8}
+  .li .edit:active{color:var(--th)}
+  .done-link{display:block; width:100%; text-align:center; padding:14px; margin-top:2px;
+    border:0; border-top:1px solid var(--line); background:#F8FAF7; color:var(--th-deep);
+    font-size:13px; font-weight:700; cursor:pointer; font-family:inherit}
+  .done-link:active{background:var(--th-soft)}
+  .sheet{position:fixed; inset:0; z-index:60; background:rgba(27,36,56,.4); backdrop-filter:blur(3px);
+    display:none; align-items:flex-end; justify-content:center}
+  .sheet.open{display:flex; animation:fade .2s ease}
+  .sheet-in{background:var(--paper); width:100%; max-width:680px; max-height:88vh; overflow-y:auto;
+    border-radius:20px 20px 0 0; padding:0 16px calc(24px + env(safe-area-inset-bottom));
+    box-shadow:0 -8px 40px rgba(27,36,56,.25)}
+  .sheet-h{position:sticky; top:0; background:var(--paper); display:flex; align-items:center;
+    padding:16px 2px 12px; font-size:16px; font-weight:800; z-index:1}
+  .sheet-h span{flex:1}
+  .sheet-x{border:0; background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:8px 14px; font-size:13px; font-weight:700; color:var(--ink-soft); cursor:pointer; font-family:inherit}
   @media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
 </style>
 </head>
@@ -432,6 +449,40 @@
     </div>
     <div class="card" id="taskList"></div>
     <div class="warn">★＝最重要。期限のあるものが自動で上に来る。<br>思いついた瞬間に入れる。あとで入れようとすると必ず忘れる。</div>
+
+    <!-- 完了したこと（別ページ） -->
+    <div class="sheet" id="doneView">
+      <div class="sheet-in">
+        <div class="sheet-h">
+          <span>完了したこと</span>
+          <button class="sheet-x" onclick="document.getElementById('doneView').classList.remove('open')">閉じる</button>
+        </div>
+        <div class="card" id="doneList"></div>
+        <div class="warn">チェックを外すと「やること」に戻ります。×で完全に削除します。</div>
+      </div>
+    </div>
+
+    <!-- 編集モーダル -->
+    <div class="sheet" id="editModal">
+      <div class="sheet-in">
+        <div class="sheet-h"><span>編集</span>
+          <button class="sheet-x" onclick="document.getElementById('editModal').classList.remove('open')">閉じる</button>
+        </div>
+        <div class="card">
+          <div class="task-form">
+            <input id="etText" type="text" placeholder="やること">
+            <div class="line">
+              <select id="etCat">
+                <option value="重要">重要</option><option value="家">家</option><option value="仕事">仕事</option>
+                <option value="手続き">手続き</option><option value="買い物">買い物</option><option value="人">人</option>
+              </select>
+              <input id="etDate" type="date">
+            </div>
+            <button class="btn theme" id="etSave" style="width:100%">保存する</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section class="view" id="v-wish">
@@ -543,6 +594,20 @@
     </div>
     <div class="warn" style="margin-top:10px">日記は写真が重いため、<b>保存したときと画面を開いたとき</b>に同期します（他は約20秒ごと）。<br>口座番号やパスワードなど、見られて困る情報は入力しないでください。</div>
 
+    <div class="sec-title">夜の通知（22:40）</div>
+    <div class="card">
+      <div class="sync-row">
+        <div class="txt">記入リマインド
+          <div class="sub">22:40 に「今日の記録をつけよう」と通知します。</div>
+        </div>
+        <button class="toggle" id="notifToggle" aria-label="通知の切り替え"></button>
+      </div>
+      <div style="padding:0 15px 14px">
+        <div id="notifMsg" style="font-size:12px; color:var(--ink-soft); line-height:1.7"></div>
+      </div>
+    </div>
+    <div class="warn" style="margin-top:10px">通知はアプリを開いていない時間帯にも届くよう設定しますが、iPhoneでは<b>ホーム画面に追加したアプリから一度開いておく</b>必要があります。確実に鳴らしたい場合は、iPhone標準の「時計」アプリのアラームも併用してください。</div>
+
     <div class="sec-title">データの持ち出し・引き継ぎ</div>
     <div class="card">
       <div class="g-lead">記録はこの端末の中だけに保存されています。機種変更や、妻の端末へ渡すときは、ここで書き出して相手の端末で読み込みます。</div>
@@ -596,6 +661,7 @@ const DIARY_PATH="/diary.json";             // 日記（写真が重いので開
 const SHARED_KEYS=["tasks","wish","money","stock","hobby"];
 let syncOn=true;                             // 同期の有効・無効
 let lastPulledAt=0;                          // 最後に取り込んだ時刻
+let localModifiedAt=0;                        // 端末側で最後に変更した時刻（未送信の変更検知用）
 let pushTimer=null;                          // 連続保存をまとめるためのタイマー
 let syncState="idle";                        // idle / syncing / error / offline
 
@@ -624,17 +690,35 @@ function pushCloud(){
   clearTimeout(pushTimer);
   pushTimer=setTimeout(async ()=>{
     setSyncBadge("syncing");
+    const stamp=Date.now();
     try{
+      const slice=sharedSlice(); slice._updatedAt=stamp;
       const res=await fetch(DB_URL+SHARED_PATH,{
         method:"PUT",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(sharedSlice())
+        body:JSON.stringify(slice)
       });
       if(!res.ok) throw new Error("HTTP "+res.status);
-      lastPulledAt=Date.now();
+      lastPulledAt=stamp;
+      if(localModifiedAt<=stamp) localModifiedAt=0;   // 送信済みなので未送信フラグを解除
       setSyncBadge("idle");
     }catch(e){ setSyncBadge("error","同期エラー（後で再試行）"); }
   }, 800);
+}
+
+/* 即時にクラウドへ送る（「今すぐ同期」用・待たずに確実に送る） */
+async function pushSharedNow(){
+  if(!syncOn) return;
+  clearTimeout(pushTimer);
+  const stamp=Date.now();
+  try{
+    const slice=sharedSlice(); slice._updatedAt=stamp;
+    const res=await fetch(DB_URL+SHARED_PATH,{
+      method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(slice)
+    });
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    lastPulledAt=stamp; localModifiedAt=0;
+  }catch(e){ setSyncBadge("error","同期エラー（後で再試行）"); }
 }
 
 /* クラウドから受け取る */
@@ -645,14 +729,20 @@ async function pullCloud(force){
     if(!res.ok) throw new Error("HTTP "+res.status);
     const data=await res.json();
     if(!data) return;                       // まだ何も無い
-    if(!force && data._updatedAt && data._updatedAt<=lastPulledAt) return; // 変化なし
+    const cloudAt=data._updatedAt||0;
+    if(!force && cloudAt && cloudAt<=lastPulledAt) return; // 変化なし
+    // 未送信のローカル変更があり、それがクラウドより新しいなら取り込まない（消えないよう保護）
+    if(localModifiedAt && cloudAt && localModifiedAt>cloudAt){
+      pushCloud();                          // 自分の新しい変更を送り直す
+      return;
+    }
     let changed=false;
     SHARED_KEYS.forEach(k=>{
       if(data[k]!==undefined && JSON.stringify(data[k])!==JSON.stringify(mem[k])){
         mem[k]=data[k]; changed=true;
       }
     });
-    lastPulledAt=data._updatedAt||Date.now();
+    lastPulledAt=cloudAt||Date.now();
     if(changed){
       try{ localStorage.setItem(KEY,JSON.stringify(mem)); }catch(e){}
       renderTasks(); renderWish(); renderMoney(); renderStock(); renderHobby("me"); renderHobby("wife");
@@ -663,6 +753,7 @@ async function pullCloud(force){
 
 /* 保存：端末に保存し、共有分はクラウドにも送る */
 function save(opts){
+  localModifiedAt=Date.now();               // ローカル変更の時刻を記録
   try{ localStorage.setItem(KEY,JSON.stringify(mem)); }
   catch(e){ alert("保存できませんでした。写真が多すぎる可能性があります（古い月の写真を減らしてください）。"); }
   pushCloud();
@@ -686,6 +777,19 @@ function pushDiary(){
       setSyncBadge("idle");
     }catch(e){ setSyncBadge("error","日記の同期に失敗（容量超過の可能性）"); }
   }, 1200);
+}
+
+/* 日記を即時に送る（「今すぐ同期」用） */
+async function pushDiaryNow(){
+  if(!syncOn) return;
+  clearTimeout(diaryPushTimer);
+  try{
+    const res=await fetch(DB_URL+DIARY_PATH,{
+      method:"PUT", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ entries:mem.diary, _updatedAt:Date.now() })
+    });
+    if(!res.ok) throw new Error("HTTP "+res.status);
+  }catch(e){ setSyncBadge("error","日記の同期に失敗（容量超過の可能性）"); }
 }
 
 /* 日記をクラウドから受け取る（アプリを開いた時・日記タブを開いた時） */
@@ -869,6 +973,7 @@ function updateProgress(){
 function daysUntil(date){ if(!date) return null; return Math.round((new Date(date)-new Date(TODAY))/86400000); }
 function renderTasks(){
   const wrap=document.getElementById("taskList"); wrap.innerHTML="";
+  if(!mem.tasks) mem.tasks=[];
   const active=mem.tasks.filter(t=>!t.done), done=mem.tasks.filter(t=>t.done);
   const groups=[
     {label:"★ 最重要",cls:"now",items:active.filter(t=>t.star)},
@@ -884,39 +989,83 @@ function renderTasks(){
     h.innerHTML=`<span>${g.label}</span><span class="cnt">${g.items.length}</span>`; wrap.appendChild(h);
     g.items.forEach(t=>wrap.appendChild(taskRow(t))); });
   if(!any) wrap.innerHTML='<div class="empty">やることはありません。</div>';
-  if(done.length){ const h=document.createElement("div"); h.className="group-h";
-    h.innerHTML=`<span>完了</span><span class="cnt">${done.length}</span>`; wrap.appendChild(h);
-    done.slice(-8).forEach(t=>wrap.appendChild(taskRow(t))); }
+  // 完了した分は専用ページ（完了リスト）で見られる。ここにはボタンだけ置く。
+  if(done.length){
+    const b=document.createElement("button"); b.className="done-link";
+    b.textContent=`完了したこと（${done.length}件）を見る →`;
+    b.onclick=()=>{ document.getElementById("doneView").classList.add("open"); renderDoneList(); };
+    wrap.appendChild(b);
+  }
 }
-function taskRow(t){
+function taskRow(t, inDone){
   const row=document.createElement("div"); row.className="li"+(t.done?" done":"");
   const box=document.createElement("button"); box.className="box"; box.textContent="✓";
-  box.onclick=()=>{ t.done=!t.done; save(); renderTasks(); };
+  box.onclick=()=>{ t.done=!t.done; save(); renderTasks(); if(inDone) renderDoneList(); };
   const txt=document.createElement("div"); txt.className="txt"; txt.textContent=t.text;
   const d=daysUntil(t.date);
-  if(t.date||t.cat){ const w=document.createElement("span"); w.className="when"+(d!==null&&d<=0?" over":"");
+  if(t.date||t.cat){ const w=document.createElement("span"); w.className="when"+(d!==null&&d<=0&&!t.done?" over":"");
     const dl=t.date?((d<0?`${-d}日超過`:d===0?"今日":`あと${d}日`)+`（${t.date.slice(5).replace("-","/")}）`):"";
     w.textContent=[t.cat,dl].filter(Boolean).join(" ・ "); txt.appendChild(w); }
+  // 編集ボタン
+  const edit=document.createElement("button"); edit.className="edit"; edit.textContent="✎";
+  edit.setAttribute("aria-label","編集");
+  edit.onclick=()=>openTaskEdit(t, inDone);
+  if(inDone){
+    const del=document.createElement("button"); del.className="del"; del.textContent="×";
+    del.onclick=()=>{ mem.tasks.splice(mem.tasks.indexOf(t),1); save(); renderDoneList(); renderTasks(); };
+    row.append(box,txt,edit,del); return row;
+  }
   const star=document.createElement("button"); star.className="star"+(t.star?" on":""); star.textContent="★";
   star.onclick=()=>{ t.star=!t.star; save(); renderTasks(); };
   const del=document.createElement("button"); del.className="del"; del.textContent="×";
   del.onclick=()=>{ mem.tasks.splice(mem.tasks.indexOf(t),1); save(); renderTasks(); };
-  row.append(box,txt,star,del); return row;
+  row.append(box,txt,edit,star,del); return row;
+}
+// 完了リスト（別ページ）
+function renderDoneList(){
+  const wrap=document.getElementById("doneList"); if(!wrap) return; wrap.innerHTML="";
+  const done=mem.tasks.filter(t=>t.done);
+  if(!done.length){ wrap.innerHTML='<div class="empty">完了したことはまだありません。</div>'; return; }
+  done.slice().reverse().forEach(t=>wrap.appendChild(taskRow(t,true)));
+}
+// 編集モーダル
+let editingTask=null, editingInDone=false;
+function openTaskEdit(t, inDone){
+  editingTask=t; editingInDone=!!inDone;
+  document.getElementById("etText").value=t.text;
+  document.getElementById("etCat").value=t.cat||"家";
+  document.getElementById("etDate").value=t.date||"";
+  document.getElementById("editModal").classList.add("open");
 }
 document.getElementById("tAdd").onclick=()=>{
   const text=document.getElementById("tText").value.trim(); if(!text) return;
+  if(!mem.tasks) mem.tasks=[];
   const cat=document.getElementById("tCat").value;
   mem.tasks.push({text,cat,date:document.getElementById("tDate").value||"",done:false,star:cat==="重要"});
   document.getElementById("tText").value=""; document.getElementById("tDate").value=""; save(); renderTasks();
 };
 document.getElementById("tText").addEventListener("keydown",e=>{ if(e.key==="Enter") document.getElementById("tAdd").click(); });
+document.getElementById("etSave").onclick=()=>{
+  if(!editingTask) return;
+  const text=document.getElementById("etText").value.trim(); if(!text) return;
+  editingTask.text=text;
+  editingTask.cat=document.getElementById("etCat").value;
+  editingTask.date=document.getElementById("etDate").value||"";
+  save();
+  document.getElementById("editModal").classList.remove("open");
+  renderTasks(); if(editingInDone) renderDoneList();
+  editingTask=null;
+};
 
 /* ===== 読む・見る・遊ぶ ===== */
 const WISH=[{k:"books",l:"本"},{k:"anime",l:"アニメ"},{k:"games",l:"ゲーム"}]; let wishKey="books";
 function renderWishTabs(){ const el=document.getElementById("wishTabs"); el.innerHTML="";
   WISH.forEach(w=>{ const b=document.createElement("button"); b.className="tab"+(w.k===wishKey?" active":"");
     b.textContent=w.l; b.onclick=()=>{ wishKey=w.k; renderWishTabs(); renderWish(); }; el.appendChild(b); }); }
-function renderWish(){ const wrap=document.getElementById("wishItems"); const items=mem.wish[wishKey]; wrap.innerHTML="";
+function renderWish(){ const wrap=document.getElementById("wishItems");
+  if(!mem.wish) mem.wish={books:[],anime:[],games:[]};
+  if(!mem.wish[wishKey]) mem.wish[wishKey]=[];
+  const items=mem.wish[wishKey]; wrap.innerHTML="";
   if(!items.length){ wrap.innerHTML='<div class="empty">まだありません。</div>'; return; }
   items.forEach((it,i)=>{ const row=document.createElement("div"); row.className="li"+(it.done?" done":"");
     const box=document.createElement("button"); box.className="box"; box.textContent="✓";
@@ -926,6 +1075,8 @@ function renderWish(){ const wrap=document.getElementById("wishItems"); const it
     del.onclick=()=>{ items.splice(i,1); save(); renderWish(); };
     row.append(box,txt,del); wrap.appendChild(row); }); }
 document.getElementById("wAdd").onclick=()=>{ const el=document.getElementById("wText"); const text=el.value.trim(); if(!text) return;
+  if(!mem.wish) mem.wish={books:[],anime:[],games:[]};
+  if(!mem.wish[wishKey]) mem.wish[wishKey]=[];
   mem.wish[wishKey].push({text,done:false}); el.value=""; save(); renderWish(); };
 document.getElementById("wText").addEventListener("keydown",e=>{ if(e.key==="Enter") document.getElementById("wAdd").click(); });
 
@@ -1067,50 +1218,53 @@ function renderStock(){
 
 /* ===== まとめ（タイムスケジュール・各表の閲覧） ===== */
 const SCHEDULE=[
-  ["06:00","起床・洗濯機を回す","朝","カーテンを開けて光を浴びる"],
+  ["06:00","起床","朝","カーテンを開けて光を浴びる"],
   ["06:05","朝の筋トレ（曜日別）","朝","下限は腹筋2分"],
-  ["06:20","家計簿・日記（前日分）","朝","レシート撮影＋1行でOK"],
-  ["06:30","読書","朝","1ページでもよい"],
-  ["06:45","身支度・朝食","朝",""],
+  ["06:20","日記・家計簿（前日分）","朝","レシート撮影＋1行でOK"],
+  ["06:40","読書","朝","隙間時間。1ページでもよい"],
+  ["06:55","やること整理①","朝","今日やる3件を決める"],
+  ["07:00","身支度・朝ごはん","朝",""],
   ["07:30","出発","移動",""],
   ["08:30","始業／今日の3件を決める","仕事","やることを3つに絞る"],
   ["12:00","昼休み","仕事","午前の連絡はここで一区切り"],
   ["13:00","午後の業務","仕事","連絡対応は午後1回にまとめる"],
   ["17:30","退勤（時刻を先に宣言）","仕事","定型作業はテンプレ化"],
-  ["20:00","帰宅・夕食（妻が用意）","夜",""],
-  ["20:40","毎日の掃除4か所","夜","10分・自分の担当"],
-  ["20:55","当番の家事／曜日別の掃除","夜","当番の日だけ"],
-  ["21:15","在庫確認 → 明日の献立を確定","夜","前日までに必ず"],
-  ["21:25","妻とまったり","夜","最優先。削らない"],
-  ["21:30","ごみ出し（日・水／第2・第4木）","夜","夜間収集。朝に出さない"],
-  ["22:40","終了アラーム／翌朝の準備","夜","スマホを置く"],
-  ["23:00","就寝","夜","同じ時間に寝る"]
+  ["19:00","帰宅・風呂","夜",""],
+  ["19:30","夜ご飯・アニメ","夜","妻の手料理"],
+  ["20:30","掃除・片付け","夜","料理以外の家事は全部自分"],
+  ["21:00","妻とまったり（アニメ・ゲーム）","夜","月水金=ゲーム／火木=アニメ"],
+  ["21:55","やること整理②","夜","明日の準備・積み残しの確認"],
+  ["22:00","勉強","夜","毎日"],
+  ["22:40","読書","夜","寝る前の隙間"],
+  ["23:00","睡眠","夜","同じ時間に寝る（睡眠7時間）"]
 ];
 const SCHEDULE_WIFE=[
   ["06:00","起床・洗顔・歯磨き","朝",""],
   ["06:15","弁当・朝ごはん・コーヒー準備","朝",""],
   ["06:30","朝食","朝",""],
-  ["06:45","片付け・食器洗い・軽く整頓・出勤服準備","朝",""],
+  ["06:45","片付け・軽く整頓・出勤服準備","朝",""],
   ["07:00","メイク10分・髪5分","朝",""],
   ["07:15","最終確認5分","朝",""],
   ["07:20","出発（7:30がタイムリミット）","移動",""],
-  ["18:30","帰宅","夜",""],
-  ["18:30","お風呂15分・髪乾かし5分・まったり10分","夜",""],
-  ["19:30","ご飯支度（終わり次第 自由時間）","夜",""],
-  ["20:30","夕食20分・片付け10分","夜",""],
+  ["18:30","帰宅・お風呂・まったり","夜",""],
+  ["19:30","ご飯支度（料理担当）","夜",""],
+  ["20:30","夕食・片付け","夜",""],
   ["21:00","自由時間","夜",""],
-  ["22:00","自由時間2","夜",""],
+  ["22:00","まったり","夜",""],
   ["23:00","就寝","夜",""]
 ];
-const CLEAN_DAILY=[["シンク","スポンジ","汚れ時のみホームリセット"],["食卓","マイクロファイバークロス","パストリーゼ"],
-  ["テーブル","マイクロファイバークロス","ホームリセット"],["床","ロボット掃除機","なし"]];
-const CLEAN_WEEK=[["月","洗面所","洗面ボウル・鏡・蛇口（クエン酸ほか）"],["火","トイレ","便器・便座・床"],
-  ["水","ホコリ","テレビ台・棚・スイッチ"],["木","排水口","キッチン・洗面・浴室（泡ハイター）"],
-  ["金","リセット","フローリング・カーペット・玄関"],["土","風呂","浴槽・壁・床（バスマジックリン）"],
-  ["日","メンテ","ロボット掃除機・空気清浄機"]];
+const CLEAN_DAILY=[["シンク","スポンジ＋食器用洗剤","水気を拭き上げまで。汚れ時はホームリセット"],["食卓","マイクロファイバークロス","パストリーゼで除菌"],
+  ["テーブル","マイクロファイバークロス","ホームリセットで拭く"],["床","ロボット掃除機","毎日1回まわす"]];
+const CLEAN_WEEK=[["月","洗面所","洗面ボウル・鏡・蛇口をクエン酸→水拭き。排水口の髪を取る"],["火","トイレ","便器（内外）・便座・床・壁の下部。トイレ用洗剤＋除菌シート"],
+  ["水","ホコリ取り","テレビ台・棚・照明・スイッチ・巾木。ハンディモップ"],["木","排水口","キッチン・洗面・浴室の排水口を泡ハイター5分→流す"],
+  ["金","床リセット","フローリング水拭き・カーペットコロコロ・玄関掃き掃除"],["土","風呂","浴槽・壁・床・排水口をバスマジックリン。鏡の水垢はクエン酸"],
+  ["日","メンテ","ロボット掃除機のゴミ捨て・フィルター、空気清浄機の掃除"]];
 const MENU_WEEK=[["月","うどん","わかめ／ホタテ／肉／カレー"],["火","肉","生姜焼き／照り焼き"],
   ["水","パスタ","クリーム／ナポリタン／ペペロン"],["木","魚",""],["金","カレー",""],["土","カレー",""],["日","パスタ",""]];
-const GOMI=[["燃えるごみ","日・水","21:30に出す"],["燃えないごみ","第2木曜","21:30に出す"],["空きびん・ペット","第4木曜","キャップ・ラベルを外す"]];
+const GOMI=[["燃えるごみ","日・水","前夜21:30に出す"],["燃えないごみ","第2木曜","前夜21:30に出す"],["空きびん・ペット","第4木曜","キャップ・ラベルを外す"]];
+const WEEK_EVENTS=[["火","レオパの餌","コオロギ4〜6匹。カルシウム粉をまぶす"],["土","レオパの餌","コオロギ4〜6匹。尻尾の太さで量を調整"],
+  ["日","オーガスタの水やり","土が乾いていたら鉢底から出るまで。受け皿の水は捨てる"],["毎日","オーガスタの葉水","霧吹きで葉に。ホコリ落とし・害虫予防"],
+  ["日・水","燃えるごみ","前夜に出す"],["第2木","燃えないごみ","前夜に出す"],["第4木","空きびん・ペット","キャップ・ラベルを外す"]];
 const TRAIN_WEEK=[["月","腹筋3分＋下半身6分","9分"],["火","腹筋2分＋大胸筋3分＋腕3分","8分"],
   ["水","腹筋3分＋背中3分＋肩甲骨ストレッチ","8分"],["木","腹筋2分＋下半身6分","8分"],
   ["金","腹筋3分＋大胸筋3分＋腕3分","9分"],["土","腹筋2分＋背中3分＋下半身6分","11分"],["日","腹筋2分のみ（回復日）","2分"]];
@@ -1118,8 +1272,8 @@ const PLAN_WEEK=[["1週目","23:30","6:35","朝の筋トレ10分だけ（下限5
   ["3週目","23:00","6:05","＋家計簿・日記10分／夜の家事1つ"],["4週目","23:00","6:00","＋読書15分（完成形）"]];
 
 const GUIDE_TABS=[
-  {k:"schedule",l:"1日の流れ"},{k:"clean",l:"掃除"},{k:"menu",l:"献立・ごみ"},
-  {k:"train",l:"筋トレ"},{k:"plan",l:"4週間プラン"},{k:"rules",l:"ルール"}
+  {k:"schedule",l:"1日の流れ"},{k:"clean",l:"掃除"},{k:"menu",l:"週イベント"},
+  {k:"train",l:"筋トレ"},{k:"selftime",l:"夜の予定"},{k:"plan",l:"4週間プラン"},{k:"rules",l:"ルール"}
 ];
 let guideKey="schedule";
 function tableHTML(headers,rows,dayCol){
@@ -1141,7 +1295,7 @@ function renderGuide(){
     // 章の中は左＝自分／右＝妻の2列で、点線の罫線に沿って並べる。
     const chapters=[
       {mark:"6",  title:"朝",   sub:"MORNING",
-       me:[["6:00","起床・洗濯機を回す"],["6:05","朝の筋トレ"],["6:20","家計簿・日記"],["6:30","読書"],["6:45","身支度・朝食"]],
+       me:[["6:00","起床"],["6:05","朝の筋トレ"],["6:20","日記・家計簿"],["6:40","読書"],["6:55","やること整理"],["7:00","身支度・朝ごはん"]],
        wf:[["6:00","起床・洗顔・歯磨き"],["6:15","弁当・朝食・コーヒー準備"],["6:30","朝食"],["6:45","片付け・整頓・服準備"]]},
       {mark:"7",  title:"出発", sub:"LEAVING",
        me:[["7:30","出発"]],
@@ -1149,12 +1303,15 @@ function renderGuide(){
       {work:true, label:"8:30 — 17:30", sub:"W O R K"},
       {mark:"18", title:"夕方", sub:"EVENING",
        me:[],
-       wf:[["18:30","帰宅・風呂・髪・まったり"],["19:30","ご飯支度"]]},
-      {mark:"20", title:"ふたりの時間", sub:"TOGETHER", together:true,
-       me:[["20:00","帰宅・夕食"],["20:40","毎日の掃除4か所"],["20:55","当番の家事・掃除"],["21:15","在庫確認→献立"],["21:25","妻とまったり"],["21:30","ごみ出し"]],
-       wf:[["20:30","夕食・片付け"],["21:00","自由時間"],["22:00","自由時間2"]]},
+       wf:[["18:30","帰宅・風呂・まったり"]]},
+      {mark:"19", title:"ふたりの時間", sub:"TOGETHER", together:true,
+       me:[["19:00","帰宅・風呂"],["19:30","夜ご飯・アニメ"],["20:30","掃除・片付け"],["21:00","妻とまったり（ゲーム/アニメ）"]],
+       wf:[["19:30","ご飯支度"],["20:30","夕食・片付け"],["21:00","まったり"]]},
+      {mark:"22", title:"自分の時間", sub:"FOR ME",
+       me:[["21:55","やること整理"],["22:00","勉強（毎日）"],["22:40","読書"]],
+       wf:[["23:00","就寝"]]},
       {mark:"23", title:"就寝", sub:"GOOD NIGHT",
-       me:[["22:40","終了アラーム・翌朝の準備"],["23:00","就寝"]],
+       me:[["23:00","睡眠"]],
        wf:[["23:00","就寝"]]}
     ];
 
@@ -1162,7 +1319,7 @@ function renderGuide(){
       ? list.map(([t,w])=>`<div class="nb-row"><span class="nb-tm">${t}</span><span class="nb-tx">${w}</span></div>`).join("")
       : '<div class="nb-row none">—</div>';
 
-    let h='<div class="g-lead">平日の1日。<b>20:00〜23:00 がふたりの時間</b>です。'
+    let h='<div class="g-lead">平日の1日。<b>19:00〜21:45 がふたりの時間</b>、そのあと自分の時間です。'
          +'崩れる日があって当然。管理するのは就寝時刻ではなく終了アラーム（22:40）。</div>'
          +'<div class="nb">'
          +'<div class="nb-top"><span class="nb-tape"></span><div class="nb-ttl">2人の1日</div>'
@@ -1182,18 +1339,17 @@ function renderGuide(){
         +'</div></section>';
     });
 
-    h+='<div class="nb-foot">ふ た り の 時 間 　 20:00 — 23:00</div></div>';
+    h+='<div class="nb-foot">ふ た り の 時 間 　 19:00 — 21:45</div></div>';
     card.innerHTML=h;
   } else if(guideKey==="clean"){
-    card.innerHTML='<div class="g-lead">毎日の4か所＋曜日別（当番の日だけ）。</div>'
+    card.innerHTML='<div class="g-lead">料理以外の家事はすべて自分の担当。毎日の4か所を習慣に。</div>'
       +tableHTML(["場所","道具","洗剤"],CLEAN_DAILY,0)
       +'<div class="g-lead">曜日別（15分・1か所）</div>'
       +tableHTML(["曜日","テーマ","内容"],CLEAN_WEEK,0);
   } else if(guideKey==="menu"){
-    card.innerHTML='<div class="g-lead">献立（明日分は前日までに確定）</div>'
-      +tableHTML(["曜日","ジャンル","候補"],MENU_WEEK,0)
-      +'<div class="g-lead">ごみ収集（吉塚5〜8丁目・夜間収集）</div>'
-      +tableHTML(["種類","収集日","メモ"],GOMI,0);
+    card.innerHTML='<div class="g-lead">曜日で決まっている世話とごみ出し。すべて自分の担当。</div>'
+      +tableHTML(["いつ","すること","メモ"],WEEK_EVENTS,0)
+      +'<div class="g-note">レオパの餌は成体の目安で火・土の週2回（幼体なら毎日〜隔日）。オーガスタは土が乾いたら水やり（夏は多め・冬は控えめ）、葉水は毎日。ごみは夜間収集なので前夜に出す。</div>';
   } else if(guideKey==="train"){
     card.innerHTML='<div class="g-lead">腹筋が毎日の軸。下限は腹筋2分。詳細は「筋トレ」タブで動画つき。</div>'
       +tableHTML(["曜日","メニュー","合計"],TRAIN_WEEK,0)
@@ -1201,6 +1357,19 @@ function renderGuide(){
   } else if(guideKey==="plan"){
     card.innerHTML='<div class="g-lead">いきなり完成形にしない。1週間に1つだけ足す。</div>'
       +tableHTML(["週","就寝","起床","足すこと"],PLAN_WEEK,0);
+  } else if(guideKey==="selftime"){
+    const rows=[
+      ["月","ゲーム","勉強","○"],
+      ["火","アニメ","勉強","○"],
+      ["水","ゲーム","勉強","○"],
+      ["木","アニメ","勉強","○"],
+      ["金","ゲーム","勉強","○"],
+      ["土","自由","勉強","○"],
+      ["日","自由","勉強","○"]
+    ];
+    card.innerHTML='<div class="g-lead">夜の使い方。<b>22:00 妻とまったり</b>（ゲーム/アニメを曜日で）→ <b>22:40 勉強</b>（毎日）→ <b>23:00 読書して就寝</b>。読書は朝6:40と寝る前の隙間で毎日。</div>'
+      +tableHTML(["曜日","22:00 まったり","22:40 勉強","読書"],rows,0)
+      +'<div class="warn" style="margin-top:10px">ゲームは月・水・金、アニメは火・木。勉強と読書は毎日。<br>睡眠は23:00〜6:00の7時間を守る。</div>';
   } else if(guideKey==="rules"){
     card.innerHTML='<div class="g-lead">迷ったらこれだけ。</div><ul class="rule-list">'
       +'<li><span class="rn">1</span><span>下限をクリアしたら○。100点でない日を×にしない。</span></li>'
@@ -1212,8 +1381,44 @@ function renderGuide(){
   body.appendChild(card);
 }
 
+/* ===== 夜の通知（22:40） ===== */
+let notifOn=false;
+try{ notifOn=localStorage.getItem("mainichi-notif")==="1"; }catch(e){}
+let lastNotifDate="";
+function notifSupported(){ return ("Notification" in window); }
+function updateNotifUI(){
+  const t=document.getElementById("notifToggle"); if(t) t.className="toggle"+(notifOn?" on":"");
+  const m=document.getElementById("notifMsg"); if(!m) return;
+  if(!notifSupported()){ m.textContent="この端末は通知に対応していません。標準の時計アプリのアラームをお使いください。"; return; }
+  if(notifOn && Notification.permission==="granted") m.textContent="通知はオンです。アプリを開いている間、22:40にお知らせします。";
+  else if(notifOn && Notification.permission!=="granted") m.textContent="通知の許可が必要です。トグルを押し直して許可してください。";
+  else m.textContent="通知はオフです。";
+}
+async function toggleNotif(){
+  if(!notifSupported()){ updateNotifUI(); return; }
+  if(!notifOn){
+    let perm=Notification.permission;
+    if(perm!=="granted") perm=await Notification.requestPermission();
+    if(perm==="granted"){ notifOn=true; try{new Notification("毎日",{body:"通知をオンにしました。22:40にお知らせします。"});}catch(e){} }
+    else notifOn=false;
+  } else notifOn=false;
+  try{ localStorage.setItem("mainichi-notif", notifOn?"1":"0"); }catch(e){}
+  updateNotifUI();
+}
+// 1分ごとに時刻を確認し、22:40になったら通知（1日1回）
+function checkNotif(){
+  if(!notifOn || !notifSupported() || Notification.permission!=="granted") return;
+  const now=new Date();
+  const key=ymd(now);
+  if(now.getHours()===22 && now.getMinutes()===40 && lastNotifDate!==key){
+    lastNotifDate=key;
+    try{ new Notification("毎日",{body:"今日の記録をつけよう。日記・家計簿・チェックを。"}); }catch(e){}
+  }
+}
+
 /* ===== 設定（データ持ち出し・引き継ぎ） ===== */
 function renderSettings(){
+  updateNotifUI();
   // 同期トグルの見た目
   const t=document.getElementById("syncToggle");
   if(t) t.className="toggle"+(syncOn?" on":"");
@@ -1244,9 +1449,11 @@ document.getElementById("syncNow").onclick=async ()=>{
   if(!syncOn){ document.getElementById("syncMsg").textContent="同期がオフです。先に自動同期をオンにしてください。"; return; }
   document.getElementById("syncMsg").textContent="同期しています…";
   setSyncBadge("syncing");
+  // 先に自分の変更を送ってから取り込む（この順でないと未送信の変更が消える）
+  await pushSharedNow();
+  await pushDiaryNow();
   await pullCloud(true);
   await pullDiary(true);
-  pushCloud(); pushDiary();
   document.getElementById("syncMsg").textContent="同期しました（日記を含む）。";
 };
 document.getElementById("setExport").onclick=()=>{
@@ -1326,6 +1533,9 @@ renderWho(); renderHobby("me"); renderHobby("wife");
    画面に戻ってきたときにも取り込み、相手の入力を素早く反映する。 */
 if(syncOn){ setSyncBadge("syncing"); pullCloud(true); pullDiary(true); } else setSyncBadge("offline");
 setInterval(()=>{ if(syncOn && document.visibilityState==="visible") pullCloud(false); }, 20000);
+document.getElementById("notifToggle").onclick=toggleNotif;
+updateNotifUI();
+setInterval(checkNotif, 30000);   // 30秒ごとに22:40かどうか確認
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") pullCloud(false); });
 window.addEventListener("online",()=>{ if(syncOn){ pullCloud(true); pushCloud(); } });
 window.addEventListener("offline",()=>{ setSyncBadge("error","オフライン"); });
