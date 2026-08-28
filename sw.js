@@ -2,7 +2,7 @@
    目的: オフラインでもアプリ本体が開けるよう、必要ファイルをキャッシュする。
    YouTube 動画など外部リソースはキャッシュせず、都度ネットワークから取得する。 */
 
-const CACHE = "mainichi-cache-v13";
+const CACHE = "mainichi-cache-v16";
 const ASSETS = [
   "./",
   "./index.html",
